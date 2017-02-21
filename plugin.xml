@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
            id="cordova-plugin-applepay"
-      version="2.1.4">
+      version="3.0.0">
 
     <name>Apple Pay</name>
     <description>Implements Apple Pay.</description>
@@ -14,7 +14,7 @@
             <clobbers target="ApplePay" />
         </js-module>
 
-        <framework src="PassKit.framework"/>
+        <framework src="PassKit.framework" weak="true"/>
 
         <header-file src="src/ios/CDVApplePay.h"/>
         <source-file src="src/ios/CDVApplePay.m"/>

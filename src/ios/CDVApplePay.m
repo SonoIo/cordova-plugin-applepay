@@ -175,36 +175,36 @@
 {
     if ([PKPaymentAuthorizationViewController canMakePayments]) {
         if ((floor(NSFoundationVersionNumber) < NSFoundationVersionNumber_iOS_8_0)) {
-            CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"This device cannot make payments."];
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{ @"message": @"This device cannot make payments", @"code": AP_PAYMENTS_NOT_SUPPORTED }];
             [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
             return;
         } else if ([[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){9, 0, 0}]) {
             if ([PKPaymentAuthorizationViewController canMakePaymentsUsingNetworks:supportedPaymentNetworks capabilities:(merchantCapabilities)]) {
-                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"This device can make payments and has a supported card"];
+                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{ @"message": @"This device can make payments and has a supported card", @"code": AP_PAYMENTS_AVAILABLE }];
                 [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
                 return;
             } else {
-                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"This device can make payments but has no supported cards"];
+                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{ @"message": @"This device can make payments but has no supported cards", @"code": AP_PAYMENTS_UNSUPPORTED_CARDS }];
                 [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
                 return;
             }
         } else if ([[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){8, 0, 0}]) {
             if ([PKPaymentAuthorizationViewController canMakePaymentsUsingNetworks:supportedPaymentNetworks]) {
-                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"This device can make payments and has a supported card"];
+                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{ @"message": @"This device can make payments and has a supported card", @"code": AP_PAYMENTS_AVAILABLE }];
                 [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
                 return;
             } else {
-                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"This device can make payments but has no supported cards"];
+                CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{ @"message": @"This device can make payments but has no supported cards", @"code": AP_PAYMENTS_UNSUPPORTED_CARDS }];
                 [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
                 return;
             }
         } else {
-            CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"This device cannot make payments."];
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{ @"message": @"This device cannot make payments", @"code": AP_PAYMENTS_NOT_SUPPORTED }];
             [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
             return;
         }
     } else {
-        CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"This device cannot make payments."];
+        CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{ @"message": @"This device cannot make payments", @"code": AP_PAYMENTS_NOT_SUPPORTED }];
         [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
         return;
     }
@@ -262,8 +262,9 @@
         return PKAddressFieldEmail;
     } else if ([billingAddressRequirement isEqualToString:@"phone"]) {
         return PKAddressFieldPhone;
+    } else if ([billingAddressRequirement isEqualToString:@"allbutcontact"]) {
+        return PKAddressFieldAll ^ PKAddressFieldEmail ^ PKAddressFieldPhone;
     }
-
 
     return PKAddressFieldNone;
 }
@@ -284,8 +285,9 @@
         return PKAddressFieldEmail;
     } else if ([shippingAddressRequirement isEqualToString:@"phone"]) {
         return PKAddressFieldPhone;
+    } else if ([shippingAddressRequirement isEqualToString:@"allbutcontact"]) {
+        return PKAddressFieldAll ^ PKAddressFieldEmail ^ PKAddressFieldPhone;
     }
-
 
     return PKAddressFieldNone;
 }
@@ -592,8 +594,10 @@
     [self.commandDelegate sendPluginResult:result callbackId:self.paymentCallbackId];
 }
 
-
-- (PKShippingMethod *)shippingMethodWithIdentifier:(NSString *)idenfifier detail:(NSString *)detail label:(NSString *)label amount:(NSDecimalNumber *)amount
+- (PKShippingMethod *)shippingMethodWithIdentifier:(NSString *)idenfifier
+                                            detail:(NSString *)detail
+                                             label:(NSString *)label
+                                            amount:(NSDecimalNumber *)amount
 {
     PKShippingMethod *shippingMethod = [PKShippingMethod new];
     shippingMethod.identifier = idenfifier;
@@ -604,5 +608,56 @@
     return shippingMethod;
 }
 
+- (void)completeLastSelectShippingMethod:(CDVInvokedUrlCommand*)command
+{
+    if (self.paymentAuthorizationSelectShippingMethodBlock) {
+
+        NSArray *summaryItems = [self itemsFromArguments:command.arguments];
+        self.paymentAuthorizationSelectShippingMethodBlock(PKPaymentAuthorizationStatusSuccess, summaryItems);
+
+        CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"Payment status applied."];
+        [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+
+    }
+}
+
+- (void) paymentAuthorizationViewController:(PKPaymentAuthorizationViewController *)controller
+                    didSelectShippingMethod:(PKShippingMethod *)shippingMethod completion:(void (^)(PKPaymentAuthorizationStatus, NSArray<PKPaymentSummaryItem *> * _Nonnull))completion
+{
+    if (completion) {
+        self.paymentAuthorizationSelectShippingMethodBlock = completion;
+    }
+
+    if (!shippingMethod) {
+        completion(PKPaymentAuthorizationStatusSuccess, @[]);
+        return;
+    }
+
+    NSDictionary* response = @{ @"event": @"ShippingMethodSelected", @"identifier": shippingMethod.identifier };
+
+    CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:response];
+    [result setKeepCallbackAsBool: YES];
+    [self.commandDelegate sendPluginResult:result callbackId:self.paymentCallbackId];
+}
+
+
+
+//- (void) paymentAuthorizationViewController:(PKPaymentAuthorizationViewController *)controller
+//                     didSelectPaymentMethod:(PKPaymentMethod *)paymentMethod
+//                                 completion:(void (^)(NSArray<PKPaymentSummaryItem *> * _Nonnull))completion
+//{
+//}
+
+//- (void) paymentAuthorizationViewController:(PKPaymentAuthorizationViewController *)controller
+//                   didSelectShippingContact:(PKContact *)contact
+//                                 completion:(void (^)(PKPaymentAuthorizationStatus, NSArray<PKShippingMethod *> * _Nonnull, NSArray<PKPaymentSummaryItem *> * _Nonnull))completion
+//{
+//}
+
+//- (void) paymentAuthorizationViewController:(PKPaymentAuthorizationViewController *)controller
+//                   didSelectShippingAddress:(ABRecordRef)address
+//                                 completion:(void (^)(PKPaymentAuthorizationStatus, NSArray<PKShippingMethod *> * _Nonnull, NSArray<PKPaymentSummaryItem *> * _Nonnull))completion
+//{
+//}
 
 @end
