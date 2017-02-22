@@ -11,7 +11,7 @@
     <platform name="ios">
 
         <js-module src="www/applepay.js" name="payment">
-            <clobbers target="ApplePay" />
+            <clobbers target="plugins.ApplePay" />
         </js-module>
 
         <framework src="PassKit.framework" weak="true"/>
