@@ -10,6 +10,10 @@ var executeCallback = function(callback, message) {
 
 var ApplePay = {
 
+    PAYMENTS_AVAILABLE: 'available',
+    PAYMENTS_NOT_SUPPORTED: 'not_supported',
+    PAYMENTS_UNSUPPORTED_CARDS: 'unsupported_cards',
+
     /**
      * Determines if the current device supports Apple Pay and has a supported card installed.
      * @param {Function} [successCallback] - Optional success callback, recieves message object.
@@ -33,14 +37,23 @@ var ApplePay = {
      * Opens the Apple Pay sheet and shows the order information.
      * @param {Function} [successCallback] - Optional success callback, recieves message object.
      * @param {Function} [errorCallback] - Optional error callback, recieves message object.
+     * @param {Function} [updateCallback] - Optional update callback, recieves event object when an user changes the Apple Pay form.
      * @returns {Promise}
      */
-    makePaymentRequest: function(order, successCallback, errorCallback) {
+    makePaymentRequest: function(order, successCallback, errorCallback, updateCallback) {
+
+        if (order) {
+            order.triggerSelect = !!updateCallback;
+        }
 
         return new Promise(function(resolve, reject) {
             exec(function(message) {
-                executeCallback(successCallback, message);
-                resolve(message);
+                if (message && message.event) {
+                    executeCallback(updateCallback, message);
+                } else {
+                    executeCallback(successCallback, message);
+                    resolve(message);
+                }
             }, function(message) {
                 executeCallback(errorCallback, message);
                 reject(message);
@@ -66,6 +79,26 @@ var ApplePay = {
                 executeCallback(errorCallback, message);
                 reject(message);
             }, 'ApplePay', 'completeLastTransaction', [status]);
+        });
+
+    },
+
+    /**
+     * Every time the user select a different shipping method a callback is issued on makePaymentRequest
+     * @param {Function} [successCallback] - Optional success callback, recieves message object.
+     * @param {Function} [errorCallback] - Optional error callback, recieves message object.
+     * @returns {Promise}
+     */
+    completeLastSelectShippingMethod: function(status, summaryItems, successCallback, errorCallback) {
+
+        return new Promise(function(resolve, reject) {
+            exec(function(message) {
+                executeCallback(successCallback, message);
+                resolve(message);
+            }, function(message) {
+                executeCallback(errorCallback, message);
+                reject(message);
+            }, 'ApplePay', 'completeLastSelectShippingMethod', [{ status: status, items: summaryItems }]);
         });
 
     }

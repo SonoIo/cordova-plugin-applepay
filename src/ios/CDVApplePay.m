@@ -557,6 +557,10 @@
                     [response setObject:shippingContact.postalAddress.ISOCountryCode forKey:@"shippingISOCountryCode"];
                 }
 
+                if (shippingContact.phoneNumber) {
+                    [response setObject:shippingContact.phoneNumber forKey:@"shippingPhone"];
+                }
+
             }
         }
 
@@ -613,7 +617,9 @@
     if (self.paymentAuthorizationSelectShippingMethodBlock) {
 
         NSArray *summaryItems = [self itemsFromArguments:command.arguments];
-        self.paymentAuthorizationSelectShippingMethodBlock(PKPaymentAuthorizationStatusSuccess, summaryItems);
+        NSString *paymentAuthorizationStatusString = [[arguments objectAtIndex:0] objectForKey:@"status"];
+        PKPaymentAuthorizationStatus paymentAuthorizationStatus = [self paymentAuthorizationStatusFromArgument:paymentAuthorizationStatusString];
+        self.paymentAuthorizationSelectShippingMethodBlock(paymentAuthorizationStatus, summaryItems);
 
         CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"Payment status applied."];
         [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
